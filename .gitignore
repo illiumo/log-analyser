@@ -209,6 +209,8 @@ __marimo__/
 # Ignore all .csv files
 *.csv
 
-*.pdf
-
 .DS_Store
+
+*.xlsx
+
+functions.txt
