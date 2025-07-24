@@ -3,6 +3,7 @@ from os_reader import OSReader
 import csv
 import openai
 import xlsxwriter
+from collections import defaultdict
 
 
 class Analyser:
@@ -16,7 +17,8 @@ class Analyser:
         self.client = openai.OpenAI(
             api_key=os.environ.get("OPENAI_API_KEY"),
         )
-        self.functions = self.get_all_functions()
+        self.functions = self._get_all_functions()
+        self.logs = defaultdict(list)
 
     def analyse(self):
         self.reader.list_all_files()
@@ -33,7 +35,7 @@ class Analyser:
             fields = next(csvreader)
 
             for row in csvreader:
-                if any(function in row[4] for function in self.functions) or "json" in row[4]:
+                if any(function in row[4] for function in self.functions) or any(function in row[3] for function in self.functions) or "json" in row[4]:
                     probe_rows.append(row)
                 elif any(phrase in row[4] for phrase in self.unanswered_phrases):
                     completion = self.client.chat.completions.create(
@@ -59,26 +61,24 @@ class Analyser:
         nonsensical_worksheet = workbook.add_worksheet("Nonsensical")
         probe_worksheet = workbook.add_worksheet("Probe")
 
-        unanswered_worksheet.write_row(0, 0, fields)
-        nonsensical_worksheet.write_row(0, 0, fields)
-        probe_worksheet.write_row(0, 0, fields)
-
-        for i, row in enumerate(unanswered_rows, start=1):
-            unanswered_worksheet.write_row(i, 0, row)
-
-        for i, row in enumerate(nonsensical_rows, start=1):
-            nonsensical_worksheet.write_row(i, 0, row)
-
-        for i, row in enumerate(probe_rows, start=1):
-            probe_worksheet.write_row(i, 0, row)
+        self._write_to_worksheet(unanswered_worksheet, fields, unanswered_rows)
+        self._write_to_worksheet(nonsensical_worksheet, fields, nonsensical_rows)
+        self._write_to_worksheet(probe_worksheet, probe_rows, probe_rows)
 
         workbook.close()
 
     @staticmethod
-    def get_all_functions():
+    def _get_all_functions():
         with open("functions.txt", mode="r") as f:
             file_content = f.read()
 
         functions = [function.strip() for function in file_content.split(",")]
 
         return functions
+
+    @staticmethod
+    def _write_to_worksheet(worksheet, fields, rows):
+        worksheet.write_row(0, 0, fields)
+
+        for i, row in enumerate(rows, start=1):
+            worksheet.write_row(i, 0, row)
